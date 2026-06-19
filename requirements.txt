@@ -1,0 +1,16 @@
+# --- Backend ---
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+requests>=2.31.0
+
+# --- Frontend ---
+streamlit>=1.35.0
+
+# --- Config / Env ---
+python-dotenv>=1.0.1
+
+# --- Testing ---
+pytest>=8.2.0
+httpx>=0.27.0
