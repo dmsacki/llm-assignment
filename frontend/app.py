@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-FRONTEND_REQUEST_TIMEOUT = 35  # slightly above the backend's own LLM timeout
+FRONTEND_REQUEST_TIMEOUT = 310  # slightly above the backend's own LLM timeout
 
 PAGE_TITLE = "University Student Support Assistant"
 SUPPORTED_TOPICS = [
@@ -43,6 +43,8 @@ def init_session_state() -> None:
     if "history" not in st.session_state:
         # Each entry: {"question": str, "answer": str, "rating": Optional[str]}
         st.session_state.history = []
+    if "selected_topic" not in st.session_state:
+        st.session_state.selected_topic = None
 
 
 def call_ask_endpoint(question: str) -> tuple[Optional[dict], Optional[str]]:
@@ -103,8 +105,14 @@ def render_sidebar() -> None:
     with st.sidebar:
         st.header("About this assistant")
         st.write("I can help with:")
-        for topic in SUPPORTED_TOPICS:
-            st.markdown(f"- {topic}")
+        
+        # Display topics in responsive columns
+        cols = st.columns(2)
+        for idx, topic in enumerate(SUPPORTED_TOPICS):
+            with cols[idx % 2]:
+                if st.button(topic, use_container_width=True, key=f"topic-{topic}"):
+                    st.session_state.selected_topic = topic
+                    st.rerun()
 
         st.divider()
         st.subheader("Backend status")
@@ -157,7 +165,14 @@ def main() -> None:
     render_sidebar()
     render_history()
 
-    question = st.chat_input("Type your question here...")
+    # Show selected topic prompt
+    if st.session_state.selected_topic:
+        st.info(f"📌 You selected: **{st.session_state.selected_topic}** - Ask your question below")
+        placeholder_text = f"Ask about {st.session_state.selected_topic.lower()}..."
+    else:
+        placeholder_text = "Type your question here..."
+
+    question = st.chat_input(placeholder_text)
 
     if question is not None:
         if not question.strip():
@@ -176,6 +191,7 @@ def main() -> None:
                         "rating": None,
                     }
                 )
+                st.session_state.selected_topic = None  # Clear selection after answering
                 st.rerun()
 
 

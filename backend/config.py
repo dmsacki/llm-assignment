@@ -26,8 +26,17 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2:1b"
 
     # --- Request behaviour ---
-    request_timeout_seconds: int = 30
+    # Increase default timeout to accommodate slower local model responses.
+    # Can be overridden via .env (REQUEST_TIMEOUT_SECONDS).
+    request_timeout_seconds: int = 300
     max_question_length: int = 500
+
+    # --- Model warm-up ---
+    # If enabled, the backend will send a small generate request on startup
+    # to warm the local model so first real requests are faster. Disable
+    # in testing environments by setting PRE_WARM_MODEL=false in .env.
+    pre_warm_model: bool = False
+    pre_warm_timeout_seconds: int = 30
 
     # --- Logging ---
     log_level: str = "INFO"

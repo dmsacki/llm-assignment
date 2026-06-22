@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import FastAPI, Request, status
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -28,10 +29,27 @@ from backend.llm_client import (
     OllamaTimeoutError,
     ask_llm,
     check_ollama_health,
+    pre_warm_model,
 )
 from backend.logging_config import get_logger
 
 logger = get_logger()
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Lifespan handler that optionally pre-warms the local model."""
+    if settings.pre_warm_model:
+        import threading
+
+        def _worker() -> None:
+            try:
+                pre_warm_model(timeout=settings.pre_warm_timeout_seconds)
+            except Exception:
+                logger.exception("Model pre-warm failed")
+
+        threading.Thread(target=_worker, daemon=True).start()
+    yield
+
 
 app = FastAPI(
     title="University Student Support Assistant API",
@@ -42,6 +60,7 @@ app = FastAPI(
         "student conduct."
     ),
     version="1.0.0",
+    lifespan=_lifespan,
 )
 
 # Allow the Streamlit frontend (typically on a different port) to call this API.
@@ -51,6 +70,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# (pre-warm executed via lifespan handler)
 
 
 # ---------------------------------------------------------------------------

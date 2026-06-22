@@ -40,6 +40,8 @@ import time
 from dataclasses import dataclass
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from backend.config import settings
 from backend.logging_config import get_logger
@@ -103,6 +105,21 @@ def _build_prompt(question: str) -> str:
     return f"{SYSTEM_PROMPT}\n\nStudent question: {question}\n\nAnswer:"
 
 
+# Configure a single Session with retries/backoff to make transient failures
+# and brief model overloads less likely to cause immediate request failures.
+_RETRY_STRATEGY = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS", "POST"],
+)
+
+_ADAPTER = HTTPAdapter(max_retries=_RETRY_STRATEGY)
+_SESSION = requests.Session()
+_SESSION.mount("http://", _ADAPTER)
+_SESSION.mount("https://", _ADAPTER)
+
+
 def ask_llm(question: str) -> LLMAnswer:
     """Send a question to the local Ollama model and return its answer.
 
@@ -120,7 +137,7 @@ def ask_llm(question: str) -> LLMAnswer:
 
     start = time.monotonic()
     try:
-        response = requests.post(
+        response = _SESSION.post(
             url,
             json=payload,
             timeout=settings.request_timeout_seconds,
@@ -136,6 +153,10 @@ def ask_llm(question: str) -> LLMAnswer:
             f"Could not reach the local LLM server at {settings.ollama_host}. "
             "Make sure Ollama is running (`ollama serve`) and the model is pulled."
         ) from exc
+    except requests.exceptions.RequestException as exc:
+        # Catch-all for other request/session related errors (including retry failures)
+        logger.error("Request to Ollama failed: %s", exc)
+        raise OllamaResponseError("Failed to communicate with the local LLM server.") from exc
 
     latency_ms = int((time.monotonic() - start) * 1000)
 
@@ -165,8 +186,28 @@ def check_ollama_health() -> bool:
     False otherwise (does not raise).
     """
     try:
-        response = requests.get(f"{settings.ollama_host}/api/tags", timeout=5)
+        response = _SESSION.get(f"{settings.ollama_host}/api/tags", timeout=5)
         return response.status_code == 200
     except requests.exceptions.RequestException as exc:
         logger.warning("Ollama health check failed: %s", exc)
         return False
+
+
+def pre_warm_model(timeout: int | None = None) -> bool:
+    """Attempt a small generate request to ensure the model is loaded.
+
+    Returns True if the model responded, False otherwise. This is intended
+    to be a cheap 'warm-up' call invoked at application startup so the first
+    real user request is less likely to hit model load latency.
+    """
+    url = f"{settings.ollama_host}/api/generate"
+    payload = {"model": settings.ollama_model, "prompt": "Hello", "stream": False}
+    try:
+        resp = _SESSION.post(url, json=payload, timeout=timeout or settings.request_timeout_seconds)
+        if resp.status_code == 200:
+            logger.info("Pre-warm generate succeeded for model %s", settings.ollama_model)
+            return True
+        logger.warning("Pre-warm generate returned status %s", resp.status_code)
+    except requests.exceptions.RequestException as exc:
+        logger.warning("Pre-warm generate failed: %s", exc)
+    return False
