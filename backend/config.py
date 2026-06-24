@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # --- Frontend ---
     backend_url: str = "http://localhost:8000"
 
+    # --- Retrieval-augmented generation ---
+    faq_file_path: str = "backend/data/university_faq.md"
+
     model_config = SettingsConfigDict(
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
@@ -67,6 +70,13 @@ class Settings(BaseSettings):
     def resolved_feedback_path(self) -> Path:
         """Return an absolute, OS-correct path for the feedback file."""
         path = Path(self.feedback_file_path)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path
+
+    def resolved_faq_path(self) -> Path:
+        """Return an absolute, OS-correct path for the FAQ markdown file."""
+        path = Path(self.faq_file_path)
         if not path.is_absolute():
             path = PROJECT_ROOT / path
         return path

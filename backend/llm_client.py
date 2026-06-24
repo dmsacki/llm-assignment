@@ -45,6 +45,7 @@ from urllib3.util.retry import Retry
 
 from backend.config import settings
 from backend.logging_config import get_logger
+from backend.rag import retrieve_relevant_chunks
 
 logger = get_logger()
 
@@ -63,13 +64,16 @@ You ONLY answer questions related to the following university service areas:
 
 Rules you must follow:
 - If a question is outside these 8 areas, politely say it is outside your \
-scope and suggest the student contact the relevant university office.
+    scope and suggest the student contact the relevant university office.
 - Never invent specific dates, fees, or policy numbers you were not given. \
-If you are not certain of an exact detail, say so clearly and recommend the \
-student confirm with the relevant office (e.g. Registrar, Library, ICT \
-Helpdesk, Hostel Office, Finance Office, Dean of Students).
+    If you are not certain of an exact detail, say so clearly and recommend the \
+    student confirm with the relevant office (e.g. Registrar, Library, ICT \
+    Helpdesk, Hostel Office, Finance Office, Dean of Students).
+- For questions about course registration, prefer and reference ARIS 3 
+    (aris3.udsm.ac.tz) as the canonical registration portal; when unsure,
+    instruct the student to check ARIS 3 or contact the Registrar's office.
 - Keep answers concise and practical: 2-5 sentences unless the student asks \
-for more detail.
+    for more detail.
 - Use a friendly, professional tone appropriate for talking to a student.
 """
 
@@ -96,12 +100,19 @@ class LLMAnswer:
 
 
 def _build_prompt(question: str) -> str:
-    """Combine the system prompt and the user's question into one prompt.
+    """Combine the system prompt, optional retrieval context, and the user's question.
 
     Ollama's /api/generate endpoint takes a single prompt string, so the
     system instructions and the user question are concatenated with a clear
     separator the model can use to distinguish instructions from content.
     """
+    chunks = retrieve_relevant_chunks(question)
+    if chunks:
+        reference_text = "\n\nReference information (use this if relevant to the question):\n"
+        for chunk in chunks:
+            reference_text += f"\n{chunk['title']}:\n{chunk['content']}\n"
+        return f"{SYSTEM_PROMPT}{reference_text}\nStudent question: {question}\n\nAnswer:"
+
     return f"{SYSTEM_PROMPT}\n\nStudent question: {question}\n\nAnswer:"
 
 
