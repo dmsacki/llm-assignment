@@ -295,16 +295,6 @@ def save_cache(chunks: List[Dict[str, str]]) -> None:
     logger.info("Saved %d chunks to cache at %s", len(chunks), path)
 
 
-def load_cache() -> List[Dict[str, str]]:
-    path = settings.resolved_scraper_cache_path()
-    if not path.exists():
-        logger.info("No cache file found at %s", path)
-        return []
-    data = json.loads(path.read_text(encoding="utf-8"))
-    logger.info("Loaded %d chunks from cache at %s", len(data), path)
-    return data
-
-
 async def scrape_and_cache() -> List[Dict[str, str]]:
     chunks = await scrape_all()
     save_cache(chunks)

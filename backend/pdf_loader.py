@@ -35,7 +35,7 @@ def _extract_text_from_pdf(pdf_path: Path) -> str:
 
 
 def _chunk_pdf_text(text: str, pdf_name: str) -> List[Dict[str, str]]:
-    """Super simple PDF chunking: split into ~8k char chunks on double newlines."""
+    """Super simple PDF chunking: split into ~max_chars char chunks on double newlines."""
     all_chunks: List[Dict[str, str]] = []
     
     # Split into paragraphs (split on double newlines)
@@ -51,7 +51,7 @@ def _chunk_pdf_text(text: str, pdf_name: str) -> List[Dict[str, str]]:
             
         para_length = len(para) + 2  # +2 for the double newlines
         
-        if current_length + para_length > 8000 and current_chunk:
+        if current_length + para_length > settings.scraper_chunk_max_chars and current_chunk:
             # Make chunk
             chunk_content = "\n\n".join(current_chunk)
             # Find first line of chunk as title
