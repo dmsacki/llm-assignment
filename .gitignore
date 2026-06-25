@@ -17,6 +17,9 @@ ENV/
 # --- Logs ---
 backend/logs/*.log
 backend/logs/*.jsonl
+/backend.log
+/frontend.log
+/backend_log.txt
 
 # --- Testing / coverage ---
 .pytest_cache/
@@ -27,6 +30,7 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
+/nul
 
 # --- OS ---
 .DS_Store
@@ -34,3 +38,9 @@ Thumbs.db
 
 # --- Streamlit ---
 .streamlit/secrets.toml
+
+# --- Scraped Data ---
+backend/data/scraped_cache.json
+
+# --- PDF Data ---
+backend/data/pdfs/

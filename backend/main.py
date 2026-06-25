@@ -32,12 +32,25 @@ from backend.llm_client import (
     pre_warm_model,
 )
 from backend.logging_config import get_logger
+from backend.pdf_loader import reset_pdf_cache
 
 logger = get_logger()
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    """Lifespan handler that optionally pre-warms the local model."""
+    """Lifespan handler that optionally scrapes UDSM pages and pre-warms the model."""
+    if settings.scrape_on_startup:
+        import asyncio
+
+        async def _scrape_worker() -> None:
+            try:
+                from backend.scraper import scrape_and_cache
+                await scrape_and_cache()
+            except Exception:
+                logger.exception("Startup scrape failed")
+
+        asyncio.create_task(_scrape_worker())
+
     if settings.pre_warm_model:
         import threading
 
@@ -255,6 +268,14 @@ def feedback(payload: FeedbackRequest) -> FeedbackResponse:
 
     logger.info("Feedback recorded | rating=%s", payload.rating)
     return FeedbackResponse(status="saved")
+
+
+@app.post("/reset-pdf-cache", tags=["admin"])
+def reset_pdf_cache_endpoint():
+    """Reset the PDF chunk cache to force reloading PDF files with new settings."""
+    reset_pdf_cache()
+    logger.info("PDF cache reset requested via API endpoint")
+    return {"status": "success", "message": "PDF cache has been reset"}
 
 
 # ---------------------------------------------------------------------------

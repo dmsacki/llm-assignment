@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     """Strongly-typed application settings.
 
-    Values are read from a `.env` file at the project root, falling back to
+    Values are read from a ".env" file at the project root, falling back to
     the defaults defined below if a variable is not set.
     """
 
@@ -50,8 +50,20 @@ class Settings(BaseSettings):
     # --- Frontend ---
     backend_url: str = "http://localhost:8000"
 
+    # --- Scraper ---
+    scraper_cache_path: str = "backend/data/scraped_cache.json"
+    scraper_timeout_seconds: int = 30
+    scrape_on_startup: bool = True
+    scraper_delay_seconds: float = 0.5  # Delay between requests to avoid overwhelming server
+    scraper_max_retries: int = 3
+    scraper_backoff_factor: float = 1.0
+    scraper_check_robots_txt: bool = True
+    scraper_chunk_min_chars: int = 50  # Minimum characters for a valid chunk
+    scraper_chunk_max_chars: int = 10000  # Maximum characters per chunk - increased for tables
+
     # --- Retrieval-augmented generation ---
     faq_file_path: str = "backend/data/university_faq.md"
+    pdf_directory: str = "backend/data/pdfs"  # Directory to look for PDF files
 
     model_config = SettingsConfigDict(
         env_file=str(PROJECT_ROOT / ".env"),
@@ -77,6 +89,20 @@ class Settings(BaseSettings):
     def resolved_faq_path(self) -> Path:
         """Return an absolute, OS-correct path for the FAQ markdown file."""
         path = Path(self.faq_file_path)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path
+
+    def resolved_scraper_cache_path(self) -> Path:
+        """Return an absolute, OS-correct path for the scraper cache file."""
+        path = Path(self.scraper_cache_path)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path
+
+    def resolved_pdf_directory(self) -> Path:
+        """Return an absolute, OS-correct path for the PDF directory."""
+        path = Path(self.pdf_directory)
         if not path.is_absolute():
             path = PROJECT_ROOT / path
         return path
